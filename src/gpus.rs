@@ -17,14 +17,13 @@ pub fn get_gpus() -> String {
     let mut gpus: Vec<String> = vec![];
     let mut gpu_counter: HashMap<String, AdapterCnt> = HashMap::new();
 
+    let amdgpu = Regex::new(r"(?i)AMD open-source driver").unwrap();
+    let mesa = Regex::new("(?i)Mesa").unwrap();
+    let vulkan = Regex::new("(?i)vulkan").unwrap();
+    let gl = Regex::new("(?i)gl").unwrap();
+    let name_fixer = Regex::new(r"(?i)\(.*(LLVM|DRM|RADV).*\)").unwrap();
 
     for a in instance.enumerate_adapters(wgpu::Backends::all()).iter().map(Adapter::get_info) {
-        let amdgpu = Regex::new(r"(?i)AMD open-source driver").unwrap();
-        let mesa = Regex::new("(?i)Mesa").unwrap();
-        let vulkan = Regex::new("(?i)vulkan").unwrap();
-        let gl = Regex::new("(?i)gl").unwrap();
-        let name_fixer = Regex::new(r"(?i)\(.*(LLVM|DRM|RADV).*\)").unwrap();
-
         let name = name_fixer.replace(a.name.as_str(), "").trim().to_string();
 
         let mut driver: Option<String> = None;
@@ -36,13 +35,14 @@ pub fn get_gpus() -> String {
         }
 
         if gpu_counter.contains_key(&name) {
-            gpu_counter.get_mut(&name).unwrap().count += 1;
-            gpu_counter.get_mut(&name).unwrap().gl |= gl.is_match(a.backend.to_str());
-            gpu_counter.get_mut(&name).unwrap().vulkan |= vulkan.is_match(a.backend.to_str());
+            let gpu = gpu_counter.get_mut(&name).unwrap();
+            gpu.count += 1;
+            gpu.gl |= gl.is_match(a.backend.to_str());
+            gpu.vulkan |= vulkan.is_match(a.backend.to_str());
             if driver.is_none() {
-                gpu_counter.get_mut(&name).unwrap().unrecognized_drivers += 1;
+                gpu.unrecognized_drivers += 1;
             } else {
-                gpu_counter.get_mut(&name).unwrap().drivers.push(driver.unwrap());
+                gpu.drivers.push(driver.unwrap());
             }
         } else {
             gpu_counter.insert(
